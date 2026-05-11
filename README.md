@@ -1,4 +1,4 @@
-# Social Extractor
+# Social Wisdom OCR & Transcriber
 
 A multimodal AI web app that extracts, transcribes, and categorises content from Instagram Reels, Instagram Posts (including carousels), YouTube videos, and local image files — then exports everything as a clean, Notion-ready `.docx` file.
 

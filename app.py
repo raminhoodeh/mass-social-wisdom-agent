@@ -723,7 +723,7 @@ def generate_docx(items: List[Dict], output_path: str):
     """
     doc = Document()
 
-    title = doc.add_heading("Social Extractor — Session Results", level=0)
+    title = doc.add_heading("Social Wisdom OCR & Transcriber — Session Results", level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.runs[0].font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
 
@@ -788,7 +788,7 @@ def run_extraction_job(job_id: str, urls: List[str], include_scan_folder: bool):
     def is_stopped() -> bool:
         return job.get("stop_requested", False)
 
-    log_fn("🚀 Social Extractor job started.")
+    log_fn("🚀 Social Wisdom OCR & Transcriber job started.")
     items:       List[Dict] = []
     failed_urls: List[str]  = []
 
