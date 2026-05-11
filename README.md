@@ -10,6 +10,10 @@ Built with **Flask**, **Google Gemini 2.5 Flash**, and the **SociaVault API**.
 
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=flat-square&logo=flask) ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python) ![Gemini](https://img.shields.io/badge/Gemini-2.5_Flash-orange?style=flat-square&logo=google)
 
+<br/>
+
+![Live Demo](demo.webp)
+
 ---
 
 ## Agent Architecture
