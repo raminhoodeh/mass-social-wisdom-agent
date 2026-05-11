@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Wisdom OCR & Transcriber</title>
+    <title>Mass Social Wisdom Agent</title>
     <meta name="description" content="Extract, transcribe, and categorise Instagram and YouTube content into a structured Word document.">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -318,6 +318,7 @@
         .log-inner .ll-done    { color: var(--green); }
         .log-inner .ll-warn    { color: var(--amber); }
         .log-inner .ll-err     { color: var(--red); }
+        .log-inner .ll-agent   { color: var(--accent-2); font-style: italic; }
         .log-inner .ll-heading { color: var(--accent-2); font-weight: 700; }
 
         /* Scrollbar */
@@ -338,7 +339,7 @@
             <!-- Logo -->
             <div class="wordmark">
                 <div class="wordmark-dot"></div>
-                <span class="wordmark-text">Social Wisdom</span>
+                <span class="wordmark-text">Mass Social Wisdom Agent</span>
             </div>
 
             <hr class="sdivider">
@@ -473,6 +474,7 @@ https://instagram.com/p/def/"></textarea>
         if (line.startsWith('✅') || line.startsWith('🚀') || line.startsWith('📄')) return 'll-done';
         if (line.startsWith('⚠️')) return 'll-warn';
         if (line.startsWith('❌')) return 'll-err';
+        if (line.includes('🤖') || line.includes('🔄')) return 'll-agent';
         if (line.startsWith('🌐') || line.startsWith('📂') || line.startsWith('🔗') || line.startsWith('🖼️')) return 'll-heading';
         return '';
     }

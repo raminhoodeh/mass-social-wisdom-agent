@@ -397,10 +397,13 @@ def gemini_vision(image: Image.Image, prompt: str) -> str:
 
 def compose_output(transcript: Optional[str], caption: Optional[str],
                    ocr_slides: Optional[List[str]] = None,
-                   kind: str = "") -> str:
+                   kind: str = "", lenient: bool = False) -> str:
     """
     Combine transcript, caption, and/or OCR slide text into a single polished,
     readable paragraph using Gemini. No labels like 'Caption:' or 'Slide 1:'.
+
+    lenient=True uses a less strict prompt — invoked by the agent retry loop
+    when the standard pass scores below quality threshold.
     """
     has_transcript = bool(transcript and transcript.strip())
     has_caption    = bool(caption and caption.strip())
@@ -432,20 +435,34 @@ def compose_output(transcript: Optional[str], caption: Optional[str],
         context_note = ""
         cap_note = ""
 
+    if lenient:
+        rules = (
+            "Rules (lenient mode — maximum content preservation):\n"
+            "- Your primary goal is faithful reproduction. Keep ALL details, even if phrasing is rough.\n"
+            "- Apply only minimal grammar fixes — do NOT restructure, shorten, or summarise.\n"
+            "- If only a caption is available, present it clearly as the main content.\n"
+            "- Do NOT discard content for being 'redundant' or 'promotional' — include everything.\n"
+            "- Output ONLY the final text. No preamble, no metadata."
+        )
+    else:
+        rules = (
+            f"Rules:\n"
+            f"- Do NOT aggressively summarise the content. Keep the final output as detailed and close to the original length as possible.\n"
+            f"- Preserve all original details, anecdotes, examples, and nuances.\n"
+            f"- Fix grammar, capitalisation, and punctuation throughout to improve flow, but do NOT strip out interesting information.\n"
+            f"- Do NOT use labels like 'Caption:', 'Transcript:', 'Slide 1:', etc. in the output.\n"
+            f"- Write in natural, flowing paragraph prose.\n"
+            f"- If there are multiple slides, merge their content into a natural narrative flow — do not number them.\n"
+            f"{cap_note}\n"
+            f"- Output ONLY the final polished text. No preamble, no metadata."
+        )
+
     prompt = f"""You are a content editor preparing notes for a personal knowledge base.
 {context_note}
 
 Your task: combine the following raw extracted content into a single, cohesive, readable passage.
 
-Rules:
-- Do NOT aggressively summarise the content. Keep the final output as detailed and close to the original length as possible.
-- Preserve all original details, anecdotes, examples, and nuances.
-- Fix grammar, capitalisation, and punctuation throughout to improve flow, but do NOT strip out interesting information.
-- Do NOT use labels like 'Caption:', 'Transcript:', 'Slide 1:', etc. in the output.
-- Write in natural, flowing paragraph prose.
-- If there are multiple slides, merge their content into a natural narrative flow — do not number them.
-{cap_note}
-- Output ONLY the final polished text. No preamble, no metadata.
+{rules}
 
 RAW CONTENT:
 {raw_block}"""
@@ -490,6 +507,42 @@ def categorise_content(content: str, source_url: str) -> str:
         if cat.lower() in result_lower or result_lower in cat.lower():
             return cat
     return "Other"
+
+
+def assess_output_quality(content: str) -> int:
+    """
+    Agent self-assessment step: ask Gemini to score the quality of composed
+    output on a scale of 1–5. Used in the agent retry loop to decide whether
+    to re-compose with a more lenient strategy.
+
+    Returns an integer 1–5:
+      1 = Gibberish, error message, or empty/useless
+      2 = Very sparse — just a short caption or a few disconnected words
+      3 = Acceptable but thin
+      4 = Good — coherent and informative
+      5 = Excellent — rich, detailed, well-structured
+    """
+    if not content or len(content.strip()) < 80:
+        return 1  # trivially too short — skip the API call
+
+    prompt = (
+        "Rate the quality of the following extracted text on a scale from 1 to 5. "
+        "Return ONLY the single digit (1, 2, 3, 4, or 5) — nothing else.\n\n"
+        "1 = Gibberish, error message, or completely empty/useless.\n"
+        "2 = Very sparse — just a short caption or a few disconnected words.\n"
+        "3 = Acceptable but thin — some real content, but limited detail.\n"
+        "4 = Good — coherent, informative prose with meaningful detail.\n"
+        "5 = Excellent — rich, detailed, well-structured content.\n\n"
+        f"Text to evaluate (first 800 chars):\n{content[:800]}"
+    )
+    try:
+        result = gemini_text(prompt).strip()
+        for ch in result:
+            if ch.isdigit():
+                return max(1, min(5, int(ch)))
+        return 3  # neutral default if parsing fails
+    except Exception:
+        return 3
 
 
 def sort_items_by_similarity(items: List[Dict], log_fn) -> List[Dict]:
@@ -678,6 +731,25 @@ def extract_from_url(url: str, log_fn) -> Optional[Dict]:
         log_fn("  ⚠️ Output composition returned empty.")
         return None
 
+    # ── Agent self-assessment & retry loop ──────────────────────
+    log_fn("  🤖 Agent: assessing output quality…")
+    quality_score = assess_output_quality(final_text)
+    log_fn(f"  🤖 Agent: quality score {quality_score}/5")
+
+    if quality_score < 3:
+        log_fn(f"  🔄 Agent decision: score too low ({quality_score}/5) — retrying with lenient composition…")
+        retry_text  = compose_output(transcript, caption, ocr_slides or None, kind=kind, lenient=True)
+        retry_score = assess_output_quality(retry_text) if retry_text and retry_text.strip() else 0
+        log_fn(f"  🤖 Agent: retry quality score {retry_score}/5")
+        if retry_score > quality_score and retry_text.strip():
+            log_fn(f"  ✅ Agent: retry improved output ({quality_score} → {retry_score}) — using retry result")
+            final_text = retry_text
+        else:
+            log_fn(f"  ⚠️ Agent: retry did not improve quality — keeping original output")
+    else:
+        log_fn(f"  ✅ Agent: quality acceptable — proceeding")
+    # ────────────────────────────────────────────────────────────
+
     try:
         category = categorise_content(final_text, url)
         log_fn(f"  ✅ Categorised as: {category}")
@@ -723,7 +795,7 @@ def generate_docx(items: List[Dict], output_path: str):
     """
     doc = Document()
 
-    title = doc.add_heading("Social Wisdom OCR & Transcriber — Session Results", level=0)
+    title = doc.add_heading("Mass Social Wisdom Agent — Session Results", level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.runs[0].font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
 
@@ -788,7 +860,7 @@ def run_extraction_job(job_id: str, urls: List[str], include_scan_folder: bool):
     def is_stopped() -> bool:
         return job.get("stop_requested", False)
 
-    log_fn("🚀 Social Wisdom OCR & Transcriber job started.")
+    log_fn("🚀 Mass Social Wisdom Agent started.")
     items:       List[Dict] = []
     failed_urls: List[str]  = []
 
