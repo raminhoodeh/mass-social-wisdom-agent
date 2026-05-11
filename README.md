@@ -142,8 +142,8 @@ Health & Wellbeing
 
 1. **Clone the repo**
    ```bash
-   git clone https://github.com/your-username/mass-social-wisdom-agent.git
-   cd mass-social-wisdom-agent
+    git clone https://github.com/raminhoodeh/mass-social-wisdom-agent.git
+    cd mass-social-wisdom-agent
    ```
 
 2. **Set up a virtual environment**
