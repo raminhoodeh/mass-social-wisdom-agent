@@ -12,7 +12,7 @@ Built with **Flask**, **Google Gemini 2.5 Flash**, and the **SociaVault API**.
 
 <br/>
 
-![Live Demo](demo.webp)
+![Live Demo](demo-animation.gif)
 
 ---
 
