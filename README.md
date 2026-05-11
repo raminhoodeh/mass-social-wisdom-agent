@@ -1,10 +1,10 @@
 # Mass Social Wisdom Agent
 
-An autonomous, multimodal AI agent that pulls wisdom from two sources at once — a **batch of social media URLs** and a **folder of local images** — then unifies everything into a single, beautifully organised knowledge document.
+An autonomous, multimodal AI agent that pulls wisdom from two sources at once - a **batch of social media URLs** and a **folder of local images** - then unifies everything into a single, beautifully organised knowledge document.
 
-Paste dozens of Instagram Reels, Instagram Posts (carousels & images), and YouTube videos into the UI. At the same time, drop screenshots, slide decks, or any image files into the local `Scan/` folder. The agent extracts transcripts, runs OCR on every image, self-assesses its own output quality, and exports a structured `.docx` file where all content is automatically sorted into topic subheadings — ready to drag into Notion.
+Paste dozens of Instagram Reels, Instagram Posts (carousels & images), and YouTube videos into the UI. At the same time, drop screenshots, slide decks, or any image files into the local `Scan/` folder. The agent extracts transcripts, runs OCR on every image, self-assesses its own output quality, and exports a structured `.docx` file where all content is automatically sorted into topic subheadings - ready to drag into Notion.
 
-The agent inspects each input, selects the right extraction strategy, invokes the appropriate tools, composes the output with an LLM, evaluates the result, self-corrects if needed, and exports — all without human input after the initial trigger.
+The agent inspects each input, selects the right extraction strategy, invokes the appropriate tools, composes the output with an LLM, evaluates the result, self-corrects if needed, and exports - all without human input after the initial trigger.
 
 Built with **Flask**, **Google Gemini 2.5 Flash**, and the **SociaVault API**.
 
@@ -52,7 +52,7 @@ Input URL
 [7. EXPORT]      Structured .docx → Notion-importable Word document
 ```
 
-The **Self-Assess → Retry** loop (steps 4–5) is what distinguishes this from a standard pipeline. The agent observes the quality of its own output, reasons about whether it meets the standard, and acts differently if it doesn't — a core property of autonomous agents.
+The **Self-Assess → Retry** loop (steps 4–5) is what distinguishes this from a standard pipeline. The agent observes the quality of its own output, reasons about whether it meets the standard, and acts differently if it doesn't - a core property of autonomous agents.
 
 ---
 
@@ -87,13 +87,13 @@ The agent scans this folder at startup, OCR-s every image using Gemini Vision, a
 ### 3. Run the Agent
 - Open the web interface at `http://127.0.0.1:5001`.
 - Paste your URLs into the left panel. Use the **Scan Folder OCR** toggle to include or exclude your local images from the current session.
-- Click **Start Extraction** and watch the right panel update in real-time — the agent logs every decision it makes: which tool it's calling, the quality score it assigned, whether it chose to retry, and which category it filed each piece of content into.
+- Click **Start Extraction** and watch the right panel update in real-time - the agent logs every decision it makes: which tool it's calling, the quality score it assigned, whether it chose to retry, and which category it filed each piece of content into.
 
 ### 4. Receive Your Knowledge Document
 Once finished, click **Download Results** to receive a structured `.docx` file that looks like this:
 
 ```
-Mass Social Wisdom Agent — Session Results
+Mass Social Wisdom Agent - Session Results
 [Date & time]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -115,7 +115,7 @@ Health & Wellbeing
 ```
 
 - Every section is an **H1 heading** (category name), so Notion's importer creates a proper page hierarchy automatically.
-- Within each category, items are **sorted by topic similarity** — so related videos and posts cluster together naturally.
+- Within each category, items are **sorted by topic similarity** - so related videos and posts cluster together naturally.
 - Source links are embedded under each entry so you can trace every piece of content back to its origin.
 - Any URLs that failed to process are saved to a `failed_urls_*.txt` file you can paste back in for a retry run.
 
