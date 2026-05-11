@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Extractor</title>
+    <meta name="description" content="Extract, transcribe, and categorise Instagram and YouTube content into a structured Word document.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:          #07080f;
+            --sidebar-bg:  #0d0e1a;
+            --surface:     rgba(255,255,255,0.04);
+            --surface-hi:  rgba(255,255,255,0.07);
+            --border:      rgba(255,255,255,0.08);
+            --border-hi:   rgba(255,255,255,0.15);
+            --accent:      #7c5cf6;
+            --accent-2:    #a78bfa;
+            --accent-glow: rgba(124,92,246,0.3);
+            --green:       #10b981;
+            --amber:       #f59e0b;
+            --red:         #ef4444;
+            --text:        #f1f0ff;
+            --muted:       #7a7998;
+            --radius:      12px;
+            --radius-sm:   8px;
+            --sidebar-w:   300px;
+        }
+
+        html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+
+        /* ── Background ──────────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 60% 50% at 10% 20%, rgba(124,92,246,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 85% 80%, rgba(16,185,129,0.07) 0%, transparent 55%);
+        }
+
+        /* ── Shell ───────────────────────────────────────────── */
+        .shell {
+            position: relative; z-index: 1;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ══════════════════════════════════════════════════════
+           LEFT SIDEBAR
+        ══════════════════════════════════════════════════════ */
+        .sidebar {
+            width: var(--sidebar-w);
+            flex-shrink: 0;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar-inner {
+            padding: 20px 16px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+
+        /* Wordmark */
+        .wordmark {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0 8px;
+        }
+        .wordmark-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+        .wordmark-text {
+            font-size: 1rem; font-weight: 800; letter-spacing: -.02em;
+            background: linear-gradient(to right, #fff 40%, var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        /* Section label */
+        .s-label {
+            font-size: 0.68rem; font-weight: 700; letter-spacing: .07em;
+            text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+        }
+
+        /* URL textarea */
+        textarea#urlInput {
+            width: 100%; min-height: 150px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.78rem; line-height: 1.6;
+            padding: 10px 12px; resize: vertical; outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        textarea#urlInput::placeholder { color: var(--muted); }
+        textarea#urlInput:focus {
+            border-color: rgba(124,92,246,.5);
+            box-shadow: 0 0 0 3px rgba(124,92,246,.1);
+        }
+
+        .hint { font-size: 0.7rem; color: var(--muted); line-height: 1.45; }
+        .hint strong { color: var(--accent-2); }
+
+        /* Toggle row */
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }
+        .toggle-info h3 { font-size: 0.82rem; font-weight: 600; }
+        .toggle-info p  { font-size: 0.72rem; color: var(--muted); line-height: 1.35; }
+        .toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+        .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-track {
+            position: absolute; inset: 0;
+            background: rgba(255,255,255,.1); border-radius: 100px; cursor: pointer;
+            transition: background .25s;
+        }
+        .toggle input:checked ~ .toggle-track { background: var(--accent); }
+        .toggle-thumb {
+            position: absolute; top: 3px; left: 3px;
+            width: 18px; height: 18px; background: #fff; border-radius: 50%;
+            transition: transform .25s; pointer-events: none;
+            box-shadow: 0 1px 4px rgba(0,0,0,.3);
+        }
+        .toggle input:checked ~ .toggle-track ~ .toggle-thumb { transform: translateX(18px); }
+
+        /* Category chips */
+        .cats-list { display: flex; flex-direction: column; gap: 4px; }
+        .cat-chip {
+            font-size: 0.72rem; font-weight: 500; color: var(--accent-2);
+            background: rgba(124,92,246,.07); border: 1px solid rgba(124,92,246,.15);
+            border-radius: 6px; padding: 4px 8px;
+        }
+
+        /* Divider */
+        .sdivider { border: none; border-top: 1px solid var(--border); }
+
+        /* Extract button */
+        .btn-extract {
+            width: 100%; padding: 13px;
+            background: linear-gradient(135deg, var(--accent), #5b3fe0);
+            color: #fff; font-family: 'Inter', sans-serif;
+            font-size: 0.9rem; font-weight: 700;
+            border: none; border-radius: 100px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all .2s; box-shadow: 0 6px 20px -6px var(--accent-glow);
+        }
+        .btn-extract:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 28px -6px var(--accent-glow); }
+        .btn-extract:active:not(:disabled) { transform: translateY(1px); }
+        .btn-extract:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Spinner */
+        .spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Status pill */
+        .status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .status-pill {
+            font-size: 0.68rem; font-weight: 700; padding: 3px 10px;
+            border-radius: 100px; letter-spacing: .05em; text-transform: uppercase;
+        }
+        .status-pill.idle    { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--border); }
+        .status-pill.running { background: rgba(124,92,246,.15); color: var(--accent-2); border: 1px solid rgba(124,92,246,.3); }
+        .status-pill.done    { background: rgba(16,185,129,.1); color: var(--green); border: 1px solid rgba(16,185,129,.25); }
+        .status-pill.error   { background: rgba(239,68,68,.1); color: var(--red); border: 1px solid rgba(239,68,68,.25); }
+
+        /* Stop button */
+        .btn-stop {
+            background: rgba(239,68,68,.12); color: var(--red);
+            border: 1px solid rgba(239,68,68,.25);
+            font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700;
+            padding: 4px 10px; border-radius: 100px; cursor: pointer;
+            transition: background .2s; display: none;
+        }
+        .btn-stop:hover { background: rgba(239,68,68,.22); }
+
+        /* Download buttons */
+        .btn-dl {
+            display: flex; align-items: center; gap: 6px;
+            color: #fff; font-family: 'Inter', sans-serif;
+            font-size: 0.78rem; font-weight: 700;
+            padding: 10px; border: none; border-radius: 100px; cursor: pointer;
+            transition: all .2s; text-decoration: none; justify-content: center;
+            width: 100%;
+        }
+        .btn-dl.green { background: var(--green); }
+        .btn-dl.amber { background: var(--amber); color: #000; }
+        .btn-dl:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-dl.hidden { display: none; }
+
+        /* ══════════════════════════════════════════════════════
+           RIGHT PANEL — LIVE OUTPUT
+        ══════════════════════════════════════════════════════ */
+        .output-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .output-header {
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(0,0,0,.2);
+            flex-shrink: 0;
+        }
+        .output-header h2 {
+            font-size: 0.8rem; font-weight: 700; letter-spacing: .06em;
+            text-transform: uppercase; color: var(--muted);
+        }
+        .output-count { font-size: 0.75rem; color: var(--muted); }
+        .output-count span { color: var(--accent-2); font-weight: 700; }
+
+        .output-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* Empty state */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--muted);
+            text-align: center;
+            padding: 40px;
+        }
+        .empty-icon { font-size: 2.5rem; opacity: .4; }
+        .empty-state h3 { font-size: 1rem; font-weight: 600; color: rgba(255,255,255,.3); }
+        .empty-state p { font-size: 0.85rem; line-height: 1.6; max-width: 340px; }
+
+        /* Category section */
+        .cat-section { margin-bottom: 32px; }
+        .cat-section:last-child { margin-bottom: 0; }
+
+        .cat-heading {
+            font-size: 0.72rem; font-weight: 800; letter-spacing: .08em;
+            text-transform: uppercase; color: var(--accent-2);
+            padding: 6px 0 10px;
+            border-bottom: 1px solid rgba(124,92,246,.2);
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .cat-heading::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent); display: block;
+        }
+
+        /* Individual content card */
+        .content-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            margin-bottom: 12px;
+            animation: slideIn .3s ease;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+        .card-source {
+            font-size: 0.72rem; color: #5b8af0;
+            text-decoration: none; word-break: break-all;
+            display: block; margin-bottom: 10px;
+            opacity: .85;
+        }
+        .card-source:hover { opacity: 1; text-decoration: underline; }
+
+        .card-body {
+            font-size: 0.88rem; line-height: 1.72;
+            color: rgba(255,255,255,.82);
+            white-space: pre-wrap;
+        }
+
+        /* Log console (collapsible at bottom) */
+        .log-toggle {
+            padding: 8px 28px;
+            border-top: 1px solid var(--border);
+            background: rgba(0,0,0,.2);
+            font-size: 0.72rem; color: var(--muted);
+            cursor: pointer; user-select: none;
+            display: flex; align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .log-toggle:hover { color: var(--text); }
+        .log-console {
+            max-height: 0; overflow: hidden;
+            transition: max-height .3s ease;
+            background: rgba(0,0,0,.35);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .log-console.open { max-height: 200px; overflow-y: auto; }
+        .log-inner { padding: 12px 28px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 0.75rem; line-height: 1.8; color: #9ba3b0; }
+        .log-inner .ll-done    { color: var(--green); }
+        .log-inner .ll-warn    { color: var(--amber); }
+        .log-inner .ll-err     { color: var(--red); }
+        .log-inner .ll-heading { color: var(--accent-2); font-weight: 700; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <!-- ═══════════════════════════════════════════════════════
+         LEFT SIDEBAR
+    ═══════════════════════════════════════════════════════ -->
+    <aside class="sidebar">
+        <div class="sidebar-inner">
+
+            <!-- Logo -->
+            <div class="wordmark">
+                <div class="wordmark-dot"></div>
+                <span class="wordmark-text">Social Extractor</span>
+            </div>
+
+            <hr class="sdivider">
+
+            <!-- URL input -->
+            <div>
+                <div class="s-label">Paste URLs</div>
+                <textarea id="urlInput" placeholder="Paste anything — descriptions + URLs mixed is fine.
+
+https://instagram.com/reels/abc/
+Finance tip - https://youtu.be/xyz
+https://instagram.com/p/def/"></textarea>
+                <p class="hint" style="margin-top:6px"><strong>Tip:</strong> Only valid URLs are extracted — paste your whole notes doc.</p>
+            </div>
+
+            <!-- Scan folder toggle -->
+            <div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h3>Scan folder OCR</h3>
+                        <p>Also OCR images in the Scan/ folder</p>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" id="scanToggle" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-thumb"></span>
+                    </label>
+                </div>
+            </div>
+
+            <hr class="sdivider">
+
+            <!-- Categories -->
+            <div>
+                <div class="s-label">Output categories</div>
+                <div class="cats-list">
+                    <div class="cat-chip">Health &amp; Wellbeing</div>
+                    <div class="cat-chip">AI or Technology Advice</div>
+                    <div class="cat-chip">Finance or Trading</div>
+                    <div class="cat-chip">Film / Movies / TV Shows</div>
+                    <div class="cat-chip">Personal Branding &amp; UGC</div>
+                    <div class="cat-chip">Conspiracy / Esoteric</div>
+                    <div class="cat-chip">Romantic Relationships</div>
+                    <div class="cat-chip">Other</div>
+                </div>
+            </div>
+
+            <hr class="sdivider">
+
+            <!-- Extract button -->
+            <button class="btn-extract" id="extractBtn" onclick="startExtraction()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                <span id="btnLabel">Start Extraction</span>
+                <div class="spinner" id="spinner"></div>
+            </button>
+
+            <!-- Status row: pill + stop -->
+            <div class="status-row">
+                <span class="status-pill idle" id="statusPill">Idle</span>
+                <button class="btn-stop" id="stopBtn" onclick="stopJob()">🛑 Stop</button>
+            </div>
+
+            <!-- Downloads -->
+            <a class="btn-dl green hidden" id="downloadBtn" href="#" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download .docx
+            </a>
+            <a class="btn-dl amber hidden" id="failedBtn" href="#" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                <span id="failedLabel">Retry Failed URLs</span>
+            </a>
+
+        </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════
+         RIGHT PANEL
+    ═══════════════════════════════════════════════════════ -->
+    <div class="output-panel">
+
+        <div class="output-header">
+            <h2>Live Output</h2>
+            <div class="output-count">Items extracted: <span id="itemCount">0</span></div>
+        </div>
+
+        <div class="output-body" id="outputBody">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">✦</div>
+                <h3>Nothing extracted yet</h3>
+                <p>Paste your URLs into the left panel and click <strong>Start Extraction</strong>. Content will appear here in real-time as each URL is processed.</p>
+            </div>
+        </div>
+
+        <!-- Collapsible log -->
+        <div class="log-toggle" id="logToggle" onclick="toggleLog()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            <span id="logToggleLabel">Show debug log</span>
+        </div>
+        <div class="log-console" id="logConsoleWrap">
+            <div class="log-inner" id="logConsole"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ── State ─────────────────────────────────────────────────
+    let currentJobId  = null;
+    let pollInterval  = null;
+    let lastLogCount  = 0;
+    let lastItemCount = 0;
+    let logOpen       = false;
+
+    // By-category buckets rendered in the output panel
+    const CATEGORIES = [
+        "Health & Wellbeing",
+        "AI or Technology Advice",
+        "Finance or Trading Advice or Tools",
+        "Film or Movies or TV Shows",
+        "Personal Branding or UGC or Social Media Tips",
+        "Conspiracy Theories or Esoteric",
+        "Romantic Relationships",
+        "Other",
+    ];
+    // Map category → section element
+    const catSections = {};
+
+    // ── Log console ───────────────────────────────────────────
+    function logClass(line) {
+        if (line.startsWith('✅') || line.startsWith('🚀') || line.startsWith('📄')) return 'll-done';
+        if (line.startsWith('⚠️')) return 'll-warn';
+        if (line.startsWith('❌')) return 'll-err';
+        if (line.startsWith('🌐') || line.startsWith('📂') || line.startsWith('🔗') || line.startsWith('🖼️')) return 'll-heading';
+        return '';
+    }
+
+    function appendLog(lines) {
+        const el = document.getElementById('logConsole');
+        lines.forEach(line => {
+            const d = document.createElement('div');
+            d.className = logClass(line);
+            d.textContent = line;
+            el.appendChild(d);
+        });
+        el.parentElement.scrollTop = el.parentElement.scrollHeight;
+    }
+
+    function toggleLog() {
+        logOpen = !logOpen;
+        document.getElementById('logConsoleWrap').classList.toggle('open', logOpen);
+        document.getElementById('logToggleLabel').textContent = logOpen ? 'Hide debug log' : 'Show debug log';
+        document.getElementById('logToggle').querySelector('svg').style.transform = logOpen ? 'rotate(180deg)' : '';
+    }
+
+    // ── Output panel rendering ────────────────────────────────
+    function getOrCreateCatSection(cat) {
+        if (catSections[cat]) return catSections[cat];
+
+        // Remove empty state
+        document.getElementById('emptyState')?.remove();
+
+        const section = document.createElement('div');
+        section.className = 'cat-section';
+        section.dataset.cat = cat;
+
+        const heading = document.createElement('div');
+        heading.className = 'cat-heading';
+        heading.textContent = cat;
+        section.appendChild(heading);
+
+        // Insert in CATEGORIES order
+        const body = document.getElementById('outputBody');
+        const allSections = [...body.querySelectorAll('.cat-section')];
+        const myIdx = CATEGORIES.indexOf(cat);
+        let inserted = false;
+        for (const existing of allSections) {
+            const existingIdx = CATEGORIES.indexOf(existing.dataset.cat);
+            if (existingIdx > myIdx) {
+                body.insertBefore(section, existing);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) body.appendChild(section);
+
+        catSections[cat] = section;
+        return section;
+    }
+
+    function renderItem(item) {
+        const section = getOrCreateCatSection(item.category || 'Other');
+
+        const card = document.createElement('div');
+        card.className = 'content-card';
+
+        const src = document.createElement('a');
+        src.className = 'card-source';
+        src.href = item.url.startsWith('http') ? item.url : '#';
+        src.target = '_blank';
+        src.textContent = item.url;
+        card.appendChild(src);
+
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        body.textContent = item.content;
+        card.appendChild(body);
+
+        section.appendChild(card);
+
+        // Scroll card into view if near bottom
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ── Extraction control ────────────────────────────────────
+    async function startExtraction() {
+        const urlText  = document.getElementById('urlInput').value.trim();
+        const inclScan = document.getElementById('scanToggle').checked;
+
+        if (!urlText && !inclScan) {
+            alert('Please paste some URLs or enable the Scan folder.');
+            return;
+        }
+
+        // Reset UI
+        document.getElementById('extractBtn').disabled = true;
+        document.getElementById('btnLabel').textContent = 'Starting…';
+        document.getElementById('spinner').style.display = 'block';
+        document.getElementById('statusPill').textContent = 'Running…';
+        document.getElementById('statusPill').className = 'status-pill running';
+        document.getElementById('stopBtn').style.display = 'inline-flex';
+        document.getElementById('downloadBtn').classList.add('hidden');
+        document.getElementById('failedBtn').classList.add('hidden');
+        document.getElementById('logConsole').innerHTML = '';
+        document.getElementById('outputBody').innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-icon">⏳</div><h3>Processing…</h3><p>Content will appear here as each URL is extracted and categorised.</p></div>';
+        document.getElementById('itemCount').textContent = '0';
+        Object.keys(catSections).forEach(k => delete catSections[k]);
+
+        lastLogCount = 0;
+        lastItemCount = 0;
+
+        try {
+            const resp = await fetch('/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls_text: urlText, include_scan: inclScan })
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                alert(data.message || 'Failed to start extraction.');
+                resetBtn();
+                return;
+            }
+
+            currentJobId = data.job_id;
+            window.hasRenderedSorted = false;
+            appendLog([`📋 Found ${data.url_count} URL(s) — job started.`]);
+            pollInterval = setInterval(pollStatus, 2000);
+
+        } catch (err) {
+            alert('Server error: ' + err.message);
+            resetBtn();
+        }
+    }
+
+    async function pollStatus() {
+        if (!currentJobId) return;
+        try {
+            const resp = await fetch(`/status/${currentJobId}`);
+            const data = await resp.json();
+
+            // Append new log lines
+            const newLog = data.log.slice(lastLogCount);
+            if (newLog.length) { appendLog(newLog); lastLogCount = data.log.length; }
+
+            // Render new content streaming in
+            const items = data.live_items || [];
+            
+            // If the backend has sorted the array at the end, do a full re-render
+            if (data.items_sorted && !window.hasRenderedSorted) {
+                window.hasRenderedSorted = true;
+                // Clear the body and reset sections
+                document.getElementById('outputBody').innerHTML = '';
+                catSections = {};
+                for (let i = 0; i < items.length; i++) {
+                    renderItem(items[i]);
+                }
+                lastItemCount = items.length;
+                document.getElementById('itemCount').textContent = lastItemCount;
+            } 
+            // Normal appending while extraction is running
+            else if (!data.items_sorted && items.length > lastItemCount) {
+                for (let i = lastItemCount; i < items.length; i++) {
+                    renderItem(items[i]);
+                }
+                lastItemCount = items.length;
+                document.getElementById('itemCount').textContent = lastItemCount;
+            }
+
+            // Job complete
+            if (data.status === 'done' || data.status === 'error') {
+                clearInterval(pollInterval); pollInterval = null;
+                resetBtn('Start New Extraction');
+
+                const pill = document.getElementById('statusPill');
+                if (data.status === 'done') {
+                    pill.textContent = lastItemCount > 0 ? `Done — ${lastItemCount} item(s)` : 'Done (nothing extracted)';
+                    pill.className = 'status-pill done';
+                } else {
+                    pill.textContent = 'Error';
+                    pill.className = 'status-pill error';
+                }
+
+                if (data.result_name) {
+                    const btn = document.getElementById('downloadBtn');
+                    btn.href = `/download/${currentJobId}`;
+                    btn.classList.remove('hidden');
+                }
+
+                if (data.failed_count > 0 && data.failed_name) {
+                    document.getElementById('failedLabel').textContent = `Retry ${data.failed_count} Failed URL(s)`;
+                    const fbtn = document.getElementById('failedBtn');
+                    fbtn.href = `/download-failed/${currentJobId}`;
+                    fbtn.classList.remove('hidden');
+                }
+
+                // Remove placeholder if still there
+                document.getElementById('emptyState')?.remove();
+                if (lastItemCount === 0) {
+                    document.getElementById('outputBody').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Nothing extracted</h3><p>All URLs failed. Check the debug log for details, then download and retry the failed URL list.</p></div>';
+                }
+            }
+
+        } catch (e) { /* silently retry */ }
+    }
+
+    async function stopJob() {
+        if (!currentJobId) return;
+        const btn = document.getElementById('stopBtn');
+        btn.textContent = '⏳ Stopping…';
+        btn.disabled = true;
+        try {
+            await fetch(`/stop/${currentJobId}`, { method: 'POST' });
+            appendLog(['🛑 Stop signal sent — finishing current URL then saving results…']);
+        } catch(e) {
+            appendLog(['❌ Could not send stop signal.']);
+        }
+    }
+
+    function resetBtn(label = 'Start Extraction') {
+        document.getElementById('extractBtn').disabled = false;
+        document.getElementById('btnLabel').textContent = label;
+        document.getElementById('spinner').style.display = 'none';
+        const stop = document.getElementById('stopBtn');
+        stop.style.display = 'none';
+        stop.disabled = false;
+        stop.textContent = '🛑 Stop';
+    }
+</script>
+</body>
+</html>
