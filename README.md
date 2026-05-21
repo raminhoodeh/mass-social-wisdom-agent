@@ -141,6 +141,8 @@ Health & Wellbeing
 - **URL Sanitisation**: Auto-strips Instagram tracking parameters (`igsh`, `si`, `utm_*`) and unwraps login-redirect URLs before hitting the API.
 
 ---
+<img width="1363" height="763" alt="image" src="https://github.com/user-attachments/assets/ff023f5c-2624-4e0a-bc80-952914033bad" />
+
 
 ## Quick Setup Guide
 
